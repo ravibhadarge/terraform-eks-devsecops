@@ -1,0 +1,17 @@
+aws_region             = "us-east-1"
+environment            = "dev"
+cluster_name           = "devsecops-dev"
+cluster_version        = "1.35"
+vpc_cidr               = "10.0.0.0/16"
+az_count               = 2
+enable_nat_gateway     = true
+endpoint_public_access = true
+public_access_cidrs    = ["0.0.0.0/0"]
+instance_types         = ["t3.small"]
+desired_size           = 2
+min_size               = 1
+max_size               = 3
+disk_size              = 50
+log_retention_days     = 7
+enable_guardduty       = true
+enable_securityhub     = true

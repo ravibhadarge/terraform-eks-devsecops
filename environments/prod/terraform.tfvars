@@ -1,0 +1,17 @@
+aws_region             = "us-east-1"
+environment            = "prod"
+cluster_name           = "devsecops-prod"
+cluster_version        = "1.35"
+vpc_cidr               = "10.2.0.0/16"
+az_count               = 2
+enable_nat_gateway     = true
+endpoint_public_access = false
+public_access_cidrs    = []
+instance_types         = ["c7i-flex.large"]
+desired_size           = 2
+min_size               = 3
+max_size               = 4
+disk_size              = 100
+log_retention_days     = 30
+enable_guardduty       = true
+enable_securityhub     = true

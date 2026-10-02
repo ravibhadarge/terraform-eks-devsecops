@@ -1,0 +1,17 @@
+aws_region             = "us-east-1"
+environment            = "staging"
+cluster_name           = "devsecops-staging"
+cluster_version        = "1.35"
+vpc_cidr               = "10.1.0.0/16"
+az_count               = 2
+enable_nat_gateway     = true
+endpoint_public_access = true
+public_access_cidrs    = ["YOUR_OFFICE_IP/32"]
+instance_types         = ["t3.small"]
+desired_size           = 2
+min_size               = 2
+max_size               = 5
+disk_size              = 50
+log_retention_days     = 14
+enable_guardduty       = true
+enable_securityhub     = true
