@@ -1,33 +1,15 @@
-variable "cluster_name" {
-  type = string
-}
-
-variable "cluster_version" {
-  type = string
-}
-
-variable "private_subnet_ids" {
-  type = list(string)
-}
+variable "cluster_name" { type = string }
+variable "private_subnet_ids" { type = list(string) }
+variable "node_security_group_ids" { type = list(string) }
 
 variable "instance_types" {
   type    = list(string)
-  default = ["t3.small"]
-}
-
-variable "ami_id" {
-  type    = string
-  default = ""
+  default = ["t3.medium"]
 }
 
 variable "disk_size" {
   type    = number
-  default = 50
-}
-
-variable "key_name" {
-  type    = string
-  default = null
+  default = 35
 }
 
 variable "desired_size" {
@@ -37,7 +19,7 @@ variable "desired_size" {
 
 variable "min_size" {
   type    = number
-  default = 1
+  default = 2
 }
 
 variable "max_size" {
@@ -48,6 +30,10 @@ variable "max_size" {
 variable "capacity_type" {
   type    = string
   default = "ON_DEMAND"
+  validation {
+    condition     = contains(["ON_DEMAND", "SPOT"], var.capacity_type)
+    error_message = "capacity_type must be ON_DEMAND or SPOT."
+  }
 }
 
 variable "node_labels" {
