@@ -6,9 +6,7 @@ resource "aws_iam_role" "node" {
     Statement = [{
       Action = "sts:AssumeRole"
       Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
+      Principal = { Service = "ec2.amazonaws.com" }
     }]
   })
 
@@ -27,11 +25,11 @@ resource "aws_iam_role_policy_attachment" "node_policies" {
   role       = aws_iam_role.node.name
 }
 
+# The EKS-managed optimized AL2023 AMI and bootstrap data are supplied by EKS.
+# The launch template only customizes encrypted root storage, metadata, and SGs.
 resource "aws_launch_template" "custom" {
-  name_prefix   = "${var.cluster_name}-"
-  image_id      = var.ami_id != "" ? var.ami_id : data.aws_ssm_parameter.eks_ami.value
-  instance_type = var.instance_types[0]
-  key_name      = var.key_name
+  name_prefix            = "${var.cluster_name}-"
+  vpc_security_group_ids = var.node_security_group_ids
 
   block_device_mappings {
     device_name = "/dev/xvda"
@@ -52,21 +50,13 @@ resource "aws_launch_template" "custom" {
 
   tag_specifications {
     resource_type = "instance"
-    tags = merge(var.tags, {
-      Name = "${var.cluster_name}-node"
-    })
+    tags = merge(var.tags, { Name = "${var.cluster_name}-node" })
   }
 
   tag_specifications {
     resource_type = "volume"
-    tags = merge(var.tags, {
-      Name = "${var.cluster_name}-node-vol"
-    })
+    tags = merge(var.tags, { Name = "${var.cluster_name}-node-volume" })
   }
-}
-
-data "aws_ssm_parameter" "eks_ami" {
-  name = "/aws/service/eks/optimized-ami/${var.cluster_version}/amazon-linux-2023/x86_64/standard/recommended/image_id"
 }
 
 resource "aws_eks_node_group" "general" {
@@ -75,6 +65,8 @@ resource "aws_eks_node_group" "general" {
   node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = var.private_subnet_ids
   capacity_type   = var.capacity_type
+  ami_type        = "AL2023_x86_64_STANDARD"
+  instance_types  = var.instance_types
 
   scaling_config {
     desired_size = var.desired_size
@@ -91,11 +83,8 @@ resource "aws_eks_node_group" "general" {
     version = aws_launch_template.custom.latest_version
   }
 
-  labels = merge(var.node_labels, {
-    role = "general"
-  })
+  labels = merge(var.node_labels, { role = "general" })
 
   depends_on = [aws_iam_role_policy_attachment.node_policies]
-
-  tags = var.tags
+  tags       = var.tags
 }

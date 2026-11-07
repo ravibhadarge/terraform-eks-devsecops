@@ -11,17 +11,12 @@ resource "aws_vpc" "this" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-vpc"
-  })
+  tags = merge(var.tags, { Name = "${var.cluster_name}-vpc" })
 }
 
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-igw"
-  })
+  tags   = merge(var.tags, { Name = "${var.cluster_name}-igw" })
 }
 
 resource "aws_subnet" "public" {
@@ -32,8 +27,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = merge(var.tags, {
-    Name                                        = "${var.cluster_name}-public-${count.index + 1}"
-    "kubernetes.io/role/elb"                    = "1"
+    Name = "${var.cluster_name}-public-${count.index + 1}"
+    "kubernetes.io/role/elb" = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   })
 }
@@ -45,39 +40,31 @@ resource "aws_subnet" "private" {
   availability_zone = local.azs[count.index]
 
   tags = merge(var.tags, {
-    Name                                        = "${var.cluster_name}-private-${count.index + 1}"
-    "kubernetes.io/role/internal-elb"           = "1"
+    Name = "${var.cluster_name}-private-${count.index + 1}"
+    "kubernetes.io/role/internal-elb" = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   })
 }
 
+# One NAT Gateway is used for this learning environment to control hourly costs.
+# For production, prefer one NAT Gateway per AZ for AZ-independent egress.
 resource "aws_eip" "nat" {
-  count  = var.enable_nat_gateway ? var.az_count : 0
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-nat-${count.index + 1}"
-  })
+  tags   = merge(var.tags, { Name = "${var.cluster_name}-nat-eip" })
 }
 
 resource "aws_nat_gateway" "this" {
-  count         = var.enable_nat_gateway ? var.az_count : 0
-  allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = aws_subnet.public[count.index].id
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-nat-${count.index + 1}"
-  })
-
-  depends_on = [aws_internet_gateway.this]
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[0].id
+  tags          = merge(var.tags, { Name = "${var.cluster_name}-nat" })
+  depends_on    = [aws_internet_gateway.this]
 }
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-public-rt"
-  })
+  tags   = merge(var.tags, { Name = "${var.cluster_name}-public-rt" })
 }
 
 resource "aws_route" "public_internet" {
@@ -95,17 +82,14 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table" "private" {
   count  = var.az_count
   vpc_id = aws_vpc.this.id
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-private-rt-${count.index + 1}"
-  })
+  tags   = merge(var.tags, { Name = "${var.cluster_name}-private-rt-${count.index + 1}" })
 }
 
 resource "aws_route" "private_nat" {
   count                  = var.enable_nat_gateway ? var.az_count : 0
   route_table_id         = aws_route_table.private[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.this[count.index].id
+  nat_gateway_id         = aws_nat_gateway.this[0].id
 }
 
 resource "aws_route_table_association" "private" {

@@ -1,0 +1,7 @@
+# Create the S3 bucket first, then copy this file to backend.hcl
+# and replace the bucket name with your globally unique bucket.
+bucket       = "REPLACE_WITH_UNIQUE_TERRAFORM_STATE_BUCKET"
+key          = "terraform-eks-devsecops/dev/terraform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true

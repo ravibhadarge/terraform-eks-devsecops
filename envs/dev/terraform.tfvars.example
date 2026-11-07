@@ -1,0 +1,12 @@
+aws_region                 = "us-east-1"
+cluster_name               = "devsecops-dev"
+cluster_version            = "1.35"
+vpc_cidr                   = "10.0.0.0/16"
+az_count                   = 2
+enable_nat_gateway         = true
+admin_public_access_cidr   = "REPLACE_WITH_YOUR_PUBLIC_IPV4/32"
+node_instance_types        = ["c7i-flex.large"]
+node_capacity_type         = "SPOT"
+node_min_size              = 2
+node_desired_size          = 2
+node_max_size              = 3
