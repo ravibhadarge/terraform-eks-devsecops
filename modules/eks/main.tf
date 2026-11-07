@@ -38,6 +38,16 @@ resource "aws_security_group" "nodes" {
   })
 }
 
+resource "aws_security_group_rule" "cluster_egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.cluster.id
+  description       = "Allow EKS control plane outbound communication"
+}
+
 resource "aws_security_group_rule" "cluster_ingress_nodes" {
   type                     = "ingress"
   from_port                = 443
