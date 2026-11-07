@@ -1,23 +1,19 @@
-data "aws_caller_identity" "current" {}
-
 data "tls_certificate" "eks" {
   url = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
 resource "aws_iam_openid_connect_provider" "eks" {
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
+  thumbprint_list = data.tls_certificate.eks.certificates[*].sha1_fingerprint
   url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
-
-  tags = var.tags
+  tags            = var.tags
 }
 
 resource "aws_kms_key" "eks" {
-  description             = "EKS Secret Encryption Key"
+  description             = "EKS Kubernetes secret encryption key"
   deletion_window_in_days = 7
   enable_key_rotation     = true
-
-  tags = var.tags
+  tags                    = var.tags
 }
 
 resource "aws_kms_alias" "eks" {
@@ -28,10 +24,17 @@ resource "aws_kms_alias" "eks" {
 resource "aws_security_group" "cluster" {
   name_prefix = "${var.cluster_name}-cluster-"
   vpc_id      = var.vpc_id
-  description = "EKS cluster security group"
+  description = "EKS control plane security group"
+  tags        = merge(var.tags, { Name = "${var.cluster_name}-cluster-sg" })
+}
 
+resource "aws_security_group" "nodes" {
+  name_prefix = "${var.cluster_name}-nodes-"
+  vpc_id      = var.vpc_id
+  description = "EKS managed worker node security group"
   tags = merge(var.tags, {
-    Name = "${var.cluster_name}-cluster-sg"
+    Name = "${var.cluster_name}-nodes-sg"
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   })
 }
 
@@ -42,18 +45,7 @@ resource "aws_security_group_rule" "cluster_ingress_nodes" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.nodes.id
   security_group_id        = aws_security_group.cluster.id
-  description              = "Allow nodes to communicate with API server"
-}
-
-resource "aws_security_group" "nodes" {
-  name_prefix = "${var.cluster_name}-node-"
-  vpc_id      = var.vpc_id
-  description = "EKS node shared security group"
-
-  tags = merge(var.tags, {
-    Name                                        = "${var.cluster_name}-node-sg"
-    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
-  })
+  description              = "Allow worker nodes to reach the EKS API"
 }
 
 resource "aws_security_group_rule" "nodes_ingress_cluster" {
@@ -63,17 +55,17 @@ resource "aws_security_group_rule" "nodes_ingress_cluster" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.cluster.id
   security_group_id        = aws_security_group.nodes.id
-  description              = "Allow cluster to communicate with nodes"
+  description              = "Allow control plane to reach worker kubelets"
 }
 
 resource "aws_security_group_rule" "nodes_ingress_self" {
   type              = "ingress"
   from_port         = 0
-  to_port           = 65535
+  to_port           = 0
   protocol          = "-1"
   self              = true
   security_group_id = aws_security_group.nodes.id
-  description       = "Allow nodes to communicate with each other"
+  description       = "Allow node-to-node traffic"
 }
 
 resource "aws_security_group_rule" "nodes_egress_all" {
@@ -83,7 +75,7 @@ resource "aws_security_group_rule" "nodes_egress_all" {
   protocol          = "-1"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.nodes.id
-  description       = "Allow all outbound traffic from nodes"
+  description       = "Allow outbound traffic from worker nodes"
 }
 
 resource "aws_eks_cluster" "this" {
@@ -100,9 +92,7 @@ resource "aws_eks_cluster" "this" {
   }
 
   encryption_config {
-    provider {
-      key_arn = aws_kms_key.eks.arn
-    }
+    provider { key_arn = aws_kms_key.eks.arn }
     resources = ["secrets"]
   }
 
@@ -120,8 +110,7 @@ resource "aws_cloudwatch_log_group" "eks" {
   count             = length(var.enabled_cluster_log_types) > 0 ? 1 : 0
   name              = "/aws/eks/${var.cluster_name}/cluster"
   retention_in_days = var.log_retention_days
-
-  tags = var.tags
+  tags              = var.tags
 }
 
 resource "aws_iam_role" "cluster" {
@@ -132,9 +121,7 @@ resource "aws_iam_role" "cluster" {
     Statement = [{
       Action = "sts:AssumeRole"
       Effect = "Allow"
-      Principal = {
-        Service = "eks.amazonaws.com"
-      }
+      Principal = { Service = "eks.amazonaws.com" }
     }]
   })
 
@@ -146,7 +133,6 @@ resource "aws_iam_role_policy_attachment" "cluster_policies" {
     "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
     "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController",
   ])
-
   policy_arn = each.value
   role       = aws_iam_role.cluster.name
 }
@@ -157,8 +143,7 @@ resource "aws_eks_addon" "vpc_cni" {
   addon_version               = var.addon_vpc_cni_version
   resolve_conflicts_on_update = "OVERWRITE"
   resolve_conflicts_on_create = "OVERWRITE"
-
-  tags = var.tags
+  tags                        = var.tags
 }
 
 resource "aws_eks_addon" "core_dns" {
@@ -167,8 +152,7 @@ resource "aws_eks_addon" "core_dns" {
   addon_version               = var.addon_coredns_version
   resolve_conflicts_on_update = "OVERWRITE"
   resolve_conflicts_on_create = "OVERWRITE"
-
-  tags = var.tags
+  tags                        = var.tags
 }
 
 resource "aws_eks_addon" "kube_proxy" {
@@ -177,16 +161,5 @@ resource "aws_eks_addon" "kube_proxy" {
   addon_version               = var.addon_kube_proxy_version
   resolve_conflicts_on_update = "OVERWRITE"
   resolve_conflicts_on_create = "OVERWRITE"
-
-  tags = var.tags
-}
-
-resource "aws_eks_addon" "ebs_csi" {
-  cluster_name                = aws_eks_cluster.this.name
-  addon_name                  = "aws-ebs-csi-driver"
-  addon_version               = var.addon_ebs_csi_version
-  resolve_conflicts_on_update = "OVERWRITE"
-  resolve_conflicts_on_create = "OVERWRITE"
-
-  tags = var.tags
+  tags                        = var.tags
 }
