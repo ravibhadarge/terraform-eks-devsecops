@@ -1,19 +1,7 @@
-variable "cluster_name" {
-  type = string
-}
-
-variable "cluster_version" {
-  type    = string
-  default = "1.35"
-}
-
-variable "vpc_id" {
-  type = string
-}
-
-variable "private_subnet_ids" {
-  type = list(string)
-}
+variable "cluster_name" { type = string }
+variable "cluster_version" { type = string }
+variable "vpc_id" { type = string }
+variable "private_subnet_ids" { type = list(string) }
 
 variable "endpoint_private_access" {
   type    = bool
@@ -26,8 +14,11 @@ variable "endpoint_public_access" {
 }
 
 variable "public_access_cidrs" {
-  type    = list(string)
-  default = ["0.0.0.0/0"]
+  type = list(string)
+  validation {
+    condition     = length(var.public_access_cidrs) > 0 && alltrue([for cidr in var.public_access_cidrs : can(cidrhost(cidr, 0))])
+    error_message = "Provide at least one valid CIDR; do not use 0.0.0.0/0 for an administrator endpoint."
+  }
 }
 
 variable "enabled_cluster_log_types" {
@@ -40,21 +31,9 @@ variable "log_retention_days" {
   default = 7
 }
 
-variable "addon_vpc_cni_version" {
-  type = string
-}
-
-variable "addon_coredns_version" {
-  type = string
-}
-
-variable "addon_kube_proxy_version" {
-  type = string
-}
-
-variable "addon_ebs_csi_version" {
-  type = string
-}
+variable "addon_vpc_cni_version" { type = string }
+variable "addon_coredns_version" { type = string }
+variable "addon_kube_proxy_version" { type = string }
 
 variable "tags" {
   type    = map(string)
